@@ -1,0 +1,33 @@
+name: Ejecutar agentes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tema:
+        description: "Tema del artículo"
+        required: true
+        default: "Cómo funciona la energía solar fotovoltaica"
+
+jobs:
+  correr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Correr agentes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TEMA: ${{ inputs.tema }}
+        run: python agentes.py
+
+      - name: Guardar resultado
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado
+          path: resultado.md
