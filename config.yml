@@ -1,6 +1,6 @@
 modelo: gemini-3.5-flash-lite      # modelo por defecto
 pausa_segundos: 13
-max_tokens: 4000
+max_tokens: 16000
 salida_final: informe_final        # informe que se entrega al terminar
 min_caracteres: 300    # una respuesta más corta se considera fallida y se reintenta
 
