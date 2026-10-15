@@ -1,4 +1,4 @@
-modelo: gemini-2.5-flash-lite      # modelo por defecto
+modelo: gemini-3.5-flash-lite      # modelo por defecto
 pausa_segundos: 13
 max_tokens: 4000
 salida_final: informe_final        # informe que se entrega al terminar
@@ -27,7 +27,7 @@ agentes:
 
   adversary:
     rol: contraatacar
-    modelo: gemini-2.5-flash       # más capaz, porque debe razonar
+    modelo: gemini-3.5-flash       # más capaz, porque debe razonar
     entradas: [informe_avance, informe_contra]   # informe_contra = tus objeciones anteriores
     produce: informe_contra
     instruccion: "Revisa el informe de avance e intenta ver dónde puede fallar. Si tienes objeciones previas, verifica si fueron resueltas y dilo. Escribe un informe con las objeciones vigentes."
@@ -40,7 +40,7 @@ agentes:
 
   redactor:
     rol: redactor
-    modelo: gemini-2.5-flash
+    modelo: gemini-3.5-flash
     entradas: informe_sintesis
     produce: informe_final
     instruccion: "Escribe un informe final sobre: {tarea}. Distingue entre resultados establecidos, heurísticas y puntos abiertos."
@@ -49,5 +49,5 @@ agentes:
 
   control_calidad:
     rol: revisor
-    modelo: gemini-2.5-flash-lite  # el revisor puede ser liviano
+    modelo: gemini-3.5-flash-lite  # el revisor puede ser liviano
     instruccion: "Revisa el texto: ¿es claro y correcto? ¿Alguna afirmación exagera lo que realmente se sabe o sugiere que se demostró la conjetura?"
