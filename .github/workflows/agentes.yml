@@ -3,14 +3,18 @@ name: Ejecutar agentes
 on:
   workflow_dispatch:
     inputs:
-      tema:
-        description: "Tema del artículo"
+      config:
+        description: "Archivo de configuración"
         required: true
-        default: "Cómo funciona la energía solar fotovoltaica"
+        default: "config.yml"
+      tema:
+        description: "Tema (opcional, reemplaza la 'tarea' del config)"
+        required: false
 
 jobs:
   correr:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -24,10 +28,12 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TEMA: ${{ inputs.tema }}
-        run: python agentes.py
+          CONFIG: ${{ inputs.config }}
+        run: python agentes.py "$CONFIG"
 
-      - name: Guardar resultado
+      - name: Guardar resultados
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resultado
-          path: resultado.md
+          name: resultados
+          path: outputs/
