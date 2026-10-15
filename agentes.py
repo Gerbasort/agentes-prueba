@@ -3,7 +3,7 @@ import sys
 import time
 import yaml
 from graphlib import TopologicalSorter
-from openai import OpenAI, RateLimitError
+from openai import OpenAI, RateLimitError, InternalServerError, APIConnectionError
 
 ruta = sys.argv[1] if len(sys.argv) > 1 else "config.yml"
 with open(ruta, encoding="utf-8") as f:
@@ -16,6 +16,13 @@ tarea = os.environ.get("TEMA") or cfg.get("tarea", "")
 roles = cfg["roles"]
 agentes = cfg["agentes"]
 ciclos = cfg.get("ciclos", [])
+
+MIN_CHARS = cfg.get("min_caracteres", 200)
+ETIQUETAS = cfg.get("etiquetas", {})
+
+
+def etiqueta_de(r):
+    return ETIQUETAS.get(r, r)
 
 client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -57,7 +64,10 @@ def llamar(etiqueta, modelo, system, user):
     espera = PAUSA - (time.time() - ultima_llamada.get(modelo, 0))
     if espera > 0:
         time.sleep(espera)
-    for intento in range(5):
+
+    cortas = 0       # respuestas vacías o demasiado cortas
+    motivo = None    # por qué terminó la última respuesta
+    for intento in range(6):
         try:
             r = client.chat.completions.create(
                 model=modelo,
@@ -67,16 +77,52 @@ def llamar(etiqueta, modelo, system, user):
                     {"role": "user", "content": user},
                 ],
             )
-            ultima_llamada[modelo] = time.time()
-            texto = r.choices[0].message.content or ""
+        except RateLimitError:
+            print(f"⚠ {etiqueta}: límite de peticiones, esperando...", flush=True)
+            time.sleep(20 * (intento + 1))
+            continue
+        except (InternalServerError, APIConnectionError) as e:
+            print(f"⚠ {etiqueta}: error temporal del servidor ({type(e).__name__}), reintentando...", flush=True)
+            time.sleep(15 * (intento + 1))
+            continue
+
+        ultima_llamada[modelo] = time.time()
+        eleccion = r.choices[0]
+        texto = (eleccion.message.content or "").strip()
+        motivo = eleccion.finish_reason
+
+        if len(texto) < MIN_CHARS:
+            cortas += 1
+            print(
+                f"⚠ {etiqueta}: respuesta vacía o muy corta ({len(texto)} caracteres, "
+                f"motivo: {motivo}), intento {cortas}/3",
+                flush=True,
+            )
             traza.write(
-                f"## {etiqueta} [{modelo}]\n\n**Prompt:**\n{user}\n\n**Respuesta:**\n{texto}\n\n---\n\n"
+                f"## {etiqueta} [{modelo}] — RESPUESTA RECHAZADA ({len(texto)} caracteres, motivo: {motivo})\n\n"
+                f"{texto}\n\n---\n\n"
             )
             traza.flush()
-            return texto
-        except RateLimitError:
-            time.sleep(20 * (intento + 1))
-    raise RuntimeError("Se superó el límite de peticiones")
+            if cortas >= 3:
+                break
+            time.sleep(PAUSA)
+            continue
+
+        if motivo == "length":
+            print(f"⚠ {etiqueta}: la respuesta se cortó por max_tokens; sube max_tokens en el config", flush=True)
+
+        traza.write(
+            f"## {etiqueta} [{modelo}]\n\n**Prompt:**\n{user}\n\n**Respuesta:**\n{texto}\n\n---\n\n"
+        )
+        traza.flush()
+        print(f"::group::Respuesta de {etiqueta}", flush=True)
+        print(texto, flush=True)
+        print("::endgroup::", flush=True)
+        return texto
+
+    raise RuntimeError(
+        f"{etiqueta} no produjo una respuesta válida tras varios intentos (último motivo: {motivo})"
+    )
 
 
 # ---------- validación ----------
@@ -128,16 +174,29 @@ historia = {}   # todas las versiones de cada informe
 def construir_prompt(id_, ronda=None, total=None):
     a = agentes[id_]
     partes = [a["instruccion"].replace("{tarea}", tarea)]
+    if CONTINUA:
+        partes.append(
+            "(Esto continúa ejecuciones anteriores: los informes que recibes incluyen trabajo previo. "
+            "No repitas lo ya establecido; parte de donde quedó.)"
+        )
     if ronda:
         partes.append(f"(Ronda {ronda} de {total} del ciclo.)")
-    for r in entradas_de(a):
-        if r in informes:
-            partes.append(f"### {r}:\n{informes[r]}")
-        else:
-            partes.append(f"### {r}:\n(todavía no existe; es la primera ronda)")
+
+    pedidas = entradas_de(a)
+    presentes = [r for r in pedidas if r in informes]   # lo que no existe, no se muestra
+    for r in presentes:
+        partes.append(f"### {etiqueta_de(r)}:\n{informes[r]}")
+    if pedidas and not presentes:
+        partes.append(
+            "(No hay trabajo previo: es la primera vez que trabajas en esto. "
+            "Produce tu informe completo desde cero.)"
+        )
+
     for r in historial_de(a):
-        for n, texto in enumerate(historia.get(r, []), 1):
-            partes.append(f"### {r} (versión {n}):\n{texto}")
+        versiones = historia.get(r, [])
+        inicio = max(0, len(versiones) - HMAX)
+        for n, texto in enumerate(versiones[inicio:], inicio + 1):
+            partes.append(f"### {etiqueta_de(r)} (versión {n}):\n{texto}")
     return "\n\n".join(partes)
 
 
