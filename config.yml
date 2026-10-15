@@ -1,17 +1,17 @@
 modelo: gemini-3.5-flash-lite      # modelo por defecto
 pausa_segundos: 13
 max_tokens: 16000
-salida_final: informe_final        # informe que se entrega al terminar
-min_caracteres: 300    # una respuesta más corta se considera fallida y se reintenta
+min_caracteres: 300
+historial_max: 6
+salida_final: informe_final
+
+tarea: "Determinar si la sucesión 2*p_n + 1, con p_n el n-ésimo primo, contiene infinitos primos (conjetura de los primos de Sophie Germain, equivalente a que existan infinitos primos seguros)"
 
 etiquetas:
   informe_avance: "Informe de avance del investigador (versión más reciente)"
   informe_contra: "Objeciones del adversario (versión más reciente)"
   informe_sintesis: "Síntesis del debate"
 
-tarea: "Determinar si la sucesión 2*p_n + 1, con p_n el n-ésimo primo, contiene infinitos primos (conjetura de los primos de Sophie Germain, equivalente a que existan infinitos primos seguros)"
-
-# Agentes que se alternan en un ciclo. Se ejecutan en este orden, N rondas.
 ciclos:
   - nombre: debate
     agentes: [investigador, adversary]
@@ -25,7 +25,7 @@ roles:
   revisor: "Eres un revisor estricto. Señalas errores y mejoras concretas. Si todo está bien, respondes solo: APROBADO."
 
 agentes:
-    investigador:
+  investigador:
     rol: investigador
     entradas: [informe_avance, informe_contra]
     produce: informe_avance
@@ -40,7 +40,7 @@ agentes:
 
   sintetizador:
     rol: sintetizar
-    historial: [informe_avance, informe_contra]  # todas las rondas
+    historial: [informe_avance, informe_contra]
     produce: informe_sintesis
     instruccion: "Revisa las iteraciones entre investigador y adversary y busca alguna en la que se pongan de acuerdo en los resultados. Genera una síntesis. Si en ninguna ronda hay acuerdo, dilo y detalla qué desacuerdos persisten."
 
@@ -55,5 +55,4 @@ agentes:
 
   control_calidad:
     rol: revisor
-    modelo: gemini-3.5-flash-lite  # el revisor puede ser liviano
     instruccion: "Revisa el texto: ¿es claro y correcto? ¿Alguna afirmación exagera lo que realmente se sabe o sugiere que se demostró la conjetura?"
