@@ -1,35 +1,53 @@
 modelo: gemini-2.5-flash-lite      # modelo por defecto
+pausa_segundos: 13
+max_tokens: 4000
+salida_final: informe_final        # informe que se entrega al terminar
+
+tarea: "Determinar si la sucesión 2*p_n + 1, con p_n el n-ésimo primo, contiene infinitos primos (conjetura de los primos de Sophie Germain, equivalente a que existan infinitos primos seguros)"
+
+# Agentes que se alternan en un ciclo. Se ejecutan en este orden, N rondas.
+ciclos:
+  - nombre: debate
+    agentes: [investigador, adversary]
+    rondas: 3
+
+roles:
+  investigador: "Eres un investigador en teoría analítica de números. Separa siempre: (1) resultados conocidos de la literatura, (2) heurísticas y evidencia numérica, (3) ideas nuevas tuyas, marcadas como conjeturales. No inventes citas, teoremas ni referencias; si no estás seguro de un resultado, dilo. No afirmes haber demostrado la conjetura salvo que presentes una demostración completa y verificable. Escribes en español."
+  contraatacar: "Eres un adversario matemático escéptico. Buscas errores, saltos lógicos, hipótesis ocultas, citas dudosas y afirmaciones sin sustento. Numera cada objeción, indica su gravedad (crítica o menor) y qué haría falta para resolverla. Si el informe resiste, dilo. Escribes en español."
+  sintetizar: "Eres un analista que integra un debate entre un investigador y un adversario. Identificas qué puntos quedaron aceptados por ambos, cuáles siguen en disputa y cuáles se descartaron. No fuerzas un acuerdo que no existe. Escribes en español."
+  redactor: "Eres un redactor matemático claro y directo. Escribes en español. No agregas afirmaciones que no estén en la síntesis que recibes."
+  revisor: "Eres un revisor estricto. Señalas errores y mejoras concretas. Si todo está bien, respondes solo: APROBADO."
 
 agentes:
   investigador:
     rol: investigador
-    recibe: informe_contra 
-    instruccion: "Obtén resultados que avancen el conocimiento acerca de la conjetura de que la progresión aritmética 2*p_n + 1, con p_n el n-ésimo primo, tiene infinitos primos. Una vez que ya iteró por sí sólo y el adversary lo contraarrestó, toma las acotaciones que le hace y trata de solucionarlas  "
-    produce: informe_avance # informe acerca de posible avance
-    # sin 'modelo' → usa el liviano por defecto
+    entradas: informe_contra       # en la ronda 1 todavía no existe
+    produce: informe_avance
+    instruccion: "Trabaja sobre: {tarea}. En la primera ronda, reúne lo conocido y propone avances. Si ya hay objeciones del adversario, respóndelas una por una: corrige el error, refuta con argumentos o admite que no se puede resolver. Entrega un informe de avance."
 
   adversary:
     rol: contraatacar
-    modelo: gemini-2.5-flash       # más capaz, porque integra y razona
-    entradas: informe_avance
-    instruccion: "Revisa el informe e intenta ver dónde puede fallar. Lo que descubre lo escribe en otro informe."
-    produce: informe_contra # informe de acotaciones
+    modelo: gemini-2.5-flash       # más capaz, porque debe razonar
+    entradas: [informe_avance, informe_contra]   # informe_contra = tus objeciones anteriores
+    produce: informe_contra
+    instruccion: "Revisa el informe de avance e intenta ver dónde puede fallar. Si tienes objeciones previas, verifica si fueron resueltas y dilo. Escribe un informe con las objeciones vigentes."
 
   sintetizador:
     rol: sintetizar
-    entradas: [informe_avance, informe_contra]
-    instruccion: "Revisa alguna iteración de adversary e investigador en la que se ponen de acuerdo en los resultados y genera una síntesis"
+    historial: [informe_avance, informe_contra]  # todas las rondas
     produce: informe_sintesis
+    instruccion: "Revisa las iteraciones entre investigador y adversary y busca alguna en la que se pongan de acuerdo en los resultados. Genera una síntesis. Si en ninguna ronda hay acuerdo, dilo y detalla qué desacuerdos persisten."
 
   redactor:
     rol: redactor
     modelo: gemini-2.5-flash
     entradas: informe_sintesis
-    instruccion: "Escribe un informe final sobre: conjetura de los primos seguros"
+    produce: informe_final
+    instruccion: "Escribe un informe final sobre: {tarea}. Distingue entre resultados establecidos, heurísticas y puntos abiertos."
     revisado_por: control_calidad
     max_rondas: 2
 
   control_calidad:
     rol: revisor
     modelo: gemini-2.5-flash-lite  # el revisor puede ser liviano
-    instruccion: "Revisa el texto: ¿es claro y correcto?"
+    instruccion: "Revisa el texto: ¿es claro y correcto? ¿Alguna afirmación exagera lo que realmente se sabe o sugiere que se demostró la conjetura?"
