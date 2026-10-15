@@ -25,18 +25,18 @@ roles:
   revisor: "Eres un revisor estricto. Señalas errores y mejoras concretas. Si todo está bien, respondes solo: APROBADO."
 
 agentes:
-  investigador:
+    investigador:
     rol: investigador
-    entradas: informe_contra       # en la ronda 1 todavía no existe
+    entradas: [informe_avance, informe_contra]
     produce: informe_avance
-    instruccion: "Trabaja sobre: {tarea}. En la primera ronda, reúne lo conocido y propone avances. Si ya hay objeciones del adversario, respóndelas una por una: corrige el error, refuta con argumentos o admite que no se puede resolver. Entrega un informe de avance."
+    instruccion: "Trabaja sobre: {tarea}. Siempre debes entregar un informe de avance completo. Si no recibes ningún informe previo, es tu primera ronda: reúne lo conocido y propone avances desde cero. Si recibes tu informe anterior y objeciones del adversario, respóndelas una por una (corrige el error, refuta con argumentos o admite que no se puede resolver) y entrega la versión mejorada del informe completo. Nunca respondas que no hay nada que hacer."
 
   adversary:
     rol: contraatacar
-    modelo: gemini-3.5-flash       # más capaz, porque debe razonar
-    entradas: [informe_avance, informe_contra]   # informe_contra = tus objeciones anteriores
+    modelo: gemini-3.5-flash
+    entradas: [informe_avance, informe_contra]
     produce: informe_contra
-    instruccion: "Revisa el informe de avance e intenta ver dónde puede fallar. Si tienes objeciones previas, verifica si fueron resueltas y dilo. Escribe un informe con las objeciones vigentes."
+    instruccion: "Revisa el informe de avance del investigador e intenta ver dónde puede fallar. Siempre debes entregar un informe de objeciones numeradas. Si no recibes objeciones tuyas anteriores, es tu primera revisión: critica el informe desde cero. Si las recibes, verifica cuáles fueron resueltas y cuáles siguen vigentes. Nunca respondas que no hay nada que revisar."
 
   sintetizador:
     rol: sintetizar
