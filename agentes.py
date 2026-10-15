@@ -1,28 +1,26 @@
 import os
 import sys
 import time
+import json
 import yaml
 from graphlib import TopologicalSorter
 from openai import OpenAI, RateLimitError, InternalServerError, APIConnectionError
 
+# ---------- configuración ----------
 ruta = sys.argv[1] if len(sys.argv) > 1 else "config.yml"
 with open(ruta, encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
 
-MODEL = cfg.get("modelo", "gemini-2.5-flash-lite")
+MODEL = cfg.get("modelo", "gemini-3.5-flash-lite")
 PAUSA = cfg.get("pausa_segundos", 7)
 MAX_TOKENS = cfg.get("max_tokens", 4000)
+MIN_CHARS = cfg.get("min_caracteres", 200)
+HMAX = cfg.get("historial_max", 6)
+ETIQUETAS = cfg.get("etiquetas", {})
 tarea = os.environ.get("TEMA") or cfg.get("tarea", "")
 roles = cfg["roles"]
 agentes = cfg["agentes"]
 ciclos = cfg.get("ciclos", [])
-
-MIN_CHARS = cfg.get("min_caracteres", 200)
-ETIQUETAS = cfg.get("etiquetas", {})
-
-
-def etiqueta_de(r):
-    return ETIQUETAS.get(r, r)
 
 client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -30,10 +28,12 @@ client = OpenAI(
 )
 
 os.makedirs("outputs", exist_ok=True)
-traza = open("outputs/traza.md", "w", encoding="utf-8")
+os.makedirs("memoria", exist_ok=True)
+traza = open("outputs/traza.md", "a", encoding="utf-8")
+traza.write(f"\n\n# ===== Nueva ejecución ({time.strftime('%Y-%m-%d %H:%M:%S')}) =====\n\n")
 
 
-# ---------- utilidades de configuración ----------
+# ---------- utilidades ----------
 def lista(x):
     if x is None:
         return []
@@ -54,6 +54,10 @@ def informe_de(id_):
 
 def modelo_de(id_):
     return agentes[id_].get("modelo", MODEL)
+
+
+def etiqueta_de(r):
+    return ETIQUETAS.get(r, r)
 
 
 # ---------- llamada al modelo ----------
@@ -166,11 +170,26 @@ try:
 except Exception as e:
     sys.exit(f"Error: hay un ciclo de dependencias que no está declarado en 'ciclos': {e}")
 
+# ---------- memoria entre ejecuciones ----------
+nombre_cfg = os.path.splitext(os.path.basename(ruta))[0]
+ESTADO = f"memoria/{nombre_cfg}.json"      # un archivo de memoria por config
+REINICIAR = os.environ.get("REINICIAR", "").lower() == "true"
+
+informes, historia, CONTINUA = {}, {}, False
+if os.path.exists(ESTADO) and not REINICIAR:
+    with open(ESTADO, encoding="utf-8") as f:
+        previo = json.load(f)
+    historia = previo["historia"]
+    # descartar versiones vacías que hayan quedado guardadas
+    historia = {k: [t for t in v if t.strip()] for k, v in historia.items()}
+    informes = {k: v[-1] for k, v in historia.items() if v}
+    CONTINUA = bool(informes)
+    print(f"↺ Continuando desde la memoria guardada: {ESTADO}", flush=True)
+else:
+    print("★ Empezando desde cero", flush=True)
+
+
 # ---------- ejecución ----------
-informes = {}   # última versión de cada informe
-historia = {}   # todas las versiones de cada informe
-
-
 def construir_prompt(id_, ronda=None, total=None):
     a = agentes[id_]
     partes = [a["instruccion"].replace("{tarea}", tarea)]
@@ -206,6 +225,8 @@ def guardar(id_, texto):
     historia.setdefault(nombre, []).append(texto)
     with open(f"outputs/{nombre}_v{len(historia[nombre])}.md", "w", encoding="utf-8") as f:
         f.write(texto)
+    with open(ESTADO, "w", encoding="utf-8") as f:
+        json.dump({"informes": informes, "historia": historia}, f, ensure_ascii=False, indent=1)
 
 
 def ejecutar(id_, ronda=None, total=None):
