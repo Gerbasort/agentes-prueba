@@ -2,6 +2,12 @@ modelo: gemini-3.5-flash-lite      # modelo por defecto
 pausa_segundos: 13
 max_tokens: 4000
 salida_final: informe_final        # informe que se entrega al terminar
+min_caracteres: 300    # una respuesta más corta se considera fallida y se reintenta
+
+etiquetas:
+  informe_avance: "Informe de avance del investigador (versión más reciente)"
+  informe_contra: "Objeciones del adversario (versión más reciente)"
+  informe_sintesis: "Síntesis del debate"
 
 tarea: "Determinar si la sucesión 2*p_n + 1, con p_n el n-ésimo primo, contiene infinitos primos (conjetura de los primos de Sophie Germain, equivalente a que existan infinitos primos seguros)"
 
