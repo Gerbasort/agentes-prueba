@@ -1,0 +1,35 @@
+modelo: gemini-2.5-flash-lite      # modelo por defecto
+
+agentes:
+  investigador:
+    rol: investigador
+    recibe: informe_contra 
+    instruccion: "Obtén resultados que avancen el conocimiento acerca de la conjetura de que la progresión aritmética 2*p_n + 1, con p_n el n-ésimo primo, tiene infinitos primos. Una vez que ya iteró por sí sólo y el adversary lo contraarrestó, toma las acotaciones que le hace y trata de solucionarlas  "
+    produce: informe_avance # informe acerca de posible avance
+    # sin 'modelo' → usa el liviano por defecto
+
+  adversary:
+    rol: contraatacar
+    modelo: gemini-2.5-flash       # más capaz, porque integra y razona
+    entradas: informe_avance
+    instruccion: "Revisa el informe e intenta ver dónde puede fallar. Lo que descubre lo escribe en otro informe."
+    produce: informe_contra # informe de acotaciones
+
+  sintetizador:
+    rol: sintetizar
+    entradas: [informe_avance, informe_contra]
+    instruccion: "Revisa alguna iteración de adversary e investigador en la que se ponen de acuerdo en los resultados y genera una síntesis"
+    produce: informe_sintesis
+
+  redactor:
+    rol: redactor
+    modelo: gemini-2.5-flash
+    entradas: informe_sintesis
+    instruccion: "Escribe un informe final sobre: conjetura de los primos seguros"
+    revisado_por: control_calidad
+    max_rondas: 2
+
+  control_calidad:
+    rol: revisor
+    modelo: gemini-2.5-flash-lite  # el revisor puede ser liviano
+    instruccion: "Revisa el texto: ¿es claro y correcto?"
