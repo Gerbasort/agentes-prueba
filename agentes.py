@@ -91,7 +91,7 @@ def llamar(etiqueta, modelo, system, user):
         texto = (eleccion.message.content or "").strip()
         motivo = eleccion.finish_reason
 
-        if len(texto) < MIN_CHARS:
+        if len(texto) < MIN_CHARS and "APROBADO" not in texto:
             cortas += 1
             print(
                 f"⚠ {etiqueta}: respuesta vacía o muy corta ({len(texto)} caracteres, "
